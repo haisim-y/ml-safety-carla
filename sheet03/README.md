@@ -109,7 +109,61 @@ From a safety perspective, three separate models are preferable for several reas
 
 ## Exercise 3.6 — Evaluation
 
-_Answer:_
+**3.6.1 — Accuracy, Precision, Recall, F1-score per model (test split)**
+
+| Model         | Accuracy | Precision | Recall | F1    | AUC   |
+|---------------|----------|-----------|--------|-------|-------|
+| Pedestrian    | 0.634    | 0.290     | 0.599  | 0.391 | 0.651 |
+| Traffic Light | 0.943    | 0.947     | 0.974  | 0.961 | 0.950 |
+| Vehicle       | 0.841    | 0.986     | 0.799  | 0.883 | 0.943 |
+
+Confusion matrix counts (test split, 3,600 images):
+
+| Model         | TP    | FP    | FN  | TN    |
+|---------------|-------|-------|-----|-------|
+| Pedestrian    | 423   | 1,035 | 283 | 1,859 |
+| Traffic Light | 2,518 | 140   | 66  | 876   |
+| Vehicle       | 2,158 | 31    | 542 | 869   |
+
+See `sheet03/confusion_matrices.png`, `roc_curves.png`, `metric_comparison.png`.
+
+**3.6.2 — Which model performs worst? Why?**
+
+The **pedestrian detector** performs worst across all metrics (F1=0.391, AUC=0.651).
+It misses 283 out of 706 real pedestrians in the test set — a false negative rate of 40%.
+
+The root causes identified during exploration:
+- Severe class imbalance: only 23.9% of training frames contain a pedestrian
+- Pedestrians occupy a median of just 156 pixels (0.03% of the image)
+- With only 1,718 positive training examples, the model overfitted after epoch 1
+  and failed to learn generalisable pedestrian features
+
+The traffic light model performs best (F1=0.961) because traffic lights are the
+majority class (73%), appear at consistent positions and scales, and have distinctive
+visual features (shape, colour) that transfer well from ImageNet pretraining.
+
+**3.6.3 — Which metric matters most from a safety perspective — precision or recall?**
+
+**Recall is the critical metric for all three detectors**, but especially for pedestrian
+and vehicle detection.
+
+- **Pedestrian detector — recall is paramount.**
+  A False Negative (missed pedestrian) means the planning module never triggers
+  emergency braking. The car continues at speed toward a person who is not in its
+  model of the world. This is a potentially fatal failure. A False Positive (false
+  alarm) causes unnecessary braking — uncomfortable, but not life-threatening.
+  Current recall of 0.599 is dangerously low for a safety-critical system.
+
+- **Vehicle detector — recall matters more than precision.**
+  Missing a vehicle (FN=542) means the car does not yield or brake when another
+  vehicle is present. The high precision (0.986) is misleading — the model is
+  overly conservative and stays silent on 20% of real vehicles.
+
+- **Traffic light detector — both matter, but recall is still primary.**
+  Missing a red light (FN) could cause a collision at an intersection. However,
+  false alarms (FP=140) may also cause the car to stop unexpectedly mid-road.
+  With recall=0.974 this model is acceptable for a baseline; the vehicle and
+  pedestrian detectors are not.
 
 ---
 
