@@ -167,6 +167,68 @@ and vehicle detection.
 
 ---
 
-## Exercise 3.7 — Reflection & Discussion
+## Exercise 3.7 — ODD Gap Analysis
 
-_Answer:_
+The ODD defines the conditions under which the system is designed to operate. All three
+models were trained exclusively on sunny daytime data from a single CARLA town. This
+creates a significant gap between what the models have learned and what the ODD permits.
+
+### Training Data vs ODD Coverage
+
+| Dimension | ODD Operating Condition | Training Data | Notes |
+|---|---|---|---|
+| Weather | Dry, clear/sunny | Sunny only | ODD states weather can change mid-drive |
+| Lighting | Daytime, normal sun angle | Daytime only | No dawn, dusk, shadows, or tunnels |
+| Camera condition | Clean lens, fixed mount | Simulated clean | No blur, dirt, or misalignment |
+| Scene type | Urban mapped roads | CARLA Town 3 only | Single virtual environment |
+| Vehicle speed | 0-50 km/h | Not controlled | Assumed within range |
+
+### The Main Gap
+
+The ODD states that weather and lighting conditions can change during a test drive. This
+means the system could be operating legally when fog appears or when lighting drops toward
+dusk. The models have never seen a single foggy or night-time frame during training, so
+their behaviour in these conditions is completely unknown.
+
+The dataset includes three additional test splits that directly cover these gaps:
+
+| Test Split | Condition | Relation to ODD |
+|---|---|---|
+| test/ | Sunny daytime, Town 3 | Within ODD |
+| test-fog/ | Foggy, daytime, Town 3 | Outside ODD - weather violated |
+| test-night/ | Night-time, Town 3 | Outside ODD - lighting violated |
+| test-town-01/ | Sunny daytime, Town 1 | Edge case - different road layout |
+
+### Expected Impact Per Model
+
+**Pedestrian detector** is expected to degrade the most in fog and at night. The model
+learned from clear bright images where pedestrians are identified by colour, clothing
+texture and shadow. Fog removes colour contrast and night turns pedestrians into dark
+silhouettes. Given the model already has poor recall in-distribution (0.599), performance
+outside the ODD is expected to be much worse.
+
+**Traffic light detector** will be moderately affected by fog and more affected by night.
+The model learned traffic lights as bright rectangles against a daytime sky. At night this
+contrast reverses and the model may not recognise the pattern. Fog diffuses the light
+source making localisation harder.
+
+**Vehicle detector** is the most likely to generalise because vehicles are large and their
+shape is preserved in fog at short range. Their headlights also make them visible at night.
+However the model learned daytime surface textures which change significantly after dark.
+
+### Runtime Safeguards
+
+The ODD specification includes runtime detection mechanisms that should trigger when
+conditions leave the operating envelope: brightness and contrast monitoring for weather
+changes, luminance thresholds for lighting changes, and blur detection for camera issues.
+These mechanisms sit outside the perception models and are responsible for handing control
+back to the human operator when the ODD is violated. Their correctness is assumed for this
+exercise but will need to be verified as part of the full safety case.
+
+### Conclusion
+
+The models are trained on a narrow subset of the permitted ODD: one virtual environment,
+one weather condition, one time of day. The pedestrian detector is already the weakest
+model in-distribution and is expected to be unacceptably unsafe in fog or at night. This
+gap between training conditions and real operating conditions is the central safety concern
+for this system and will be analysed further in Sheets 5 and 9.
