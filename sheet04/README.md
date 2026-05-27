@@ -31,3 +31,60 @@ system and are out of scope for this exercise.
 
 The pedestrian detector (recall = 0.599) and traffic light detector (recall = 0.974)
 both fail their respective recall constraints.
+
+---
+
+## Exercise 4.7 — Per-Class Evaluation
+
+**4.7.1 — Precision, Recall, and F1-score per model (test split)**
+
+Computed using sheet03/evaluate.py on the sunny daytime test split (3,600 images).
+
+| Model | Precision | Recall | F1-score |
+|---|---|---|---|
+| Pedestrian | 0.290 | 0.599 | 0.391 |
+| Traffic Light | 0.947 | 0.974 | 0.961 |
+| Vehicle | 0.986 | 0.799 | 0.883 |
+
+**4.7.2 — Confusion matrices**
+
+See sheet03/confusion_matrices.png for the full confusion matrices.
+
+| Model | TP | FP | FN | TN |
+|---|---|---|---|---|
+| Pedestrian | 423 | 1035 | 283 | 1859 |
+| Traffic Light | 2518 | 140 | 66 | 876 |
+| Vehicle | 2158 | 31 | 542 | 869 |
+
+**4.7.3 — Which model has the lowest recall?**
+
+The pedestrian detector has the lowest recall at 0.599. This means it misses 40% of
+real pedestrians in the test set (283 out of 706 positive frames).
+
+This is exactly what the hazard analysis predicted. In Exercise 2.7, UCA-2 identified
+missed pedestrian detection as the highest severity failure mode. The reasons are
+consistent with the dataset exploration from Sheet 3: pedestrians appear in only 24%
+of training frames, occupy a median of just 156 pixels per image, and the model
+overfitted after a single epoch due to insufficient positive examples. The traffic
+light model, by contrast, benefits from 73% positive class representation and a
+consistent visual appearance, which is why it achieves recall of 0.974.
+
+**4.7.4 — Minimum recall required for pedestrian detector before deployment**
+
+A minimum recall of 0.99 is required before the pedestrian detector can be considered
+for deployment.
+
+The justification is based on the stopping distance argument. At 50 km/h the vehicle
+travels approximately 14 metres per second. A standard emergency braking distance at
+this speed is roughly 25 metres, meaning the detector must trigger braking at least
+1.8 seconds before impact. If the detector misses 1 in 100 pedestrians (recall = 0.99),
+each missed detection is a potential collision with no fallback from the planner since
+the planner only acts on detector outputs.
+
+The human operator is the only remaining fallback, but as noted in the system
+description, operators work 4-hour shifts and are subject to attention fatigue. Relying
+on operator intervention to compensate for a 40% miss rate (the current situation) is
+not an acceptable safety argument. The constraint of recall >= 0.99 was derived in
+Exercise 2.7 and the current model fails it by a significant margin. The model needs
+substantially more training data, particularly positive pedestrian examples, before it
+can be considered safe for deployment.
